@@ -1,17 +1,24 @@
-export default function DetailView({ scene }) {
-  if (!scene) return <div className="panel detail">Select a scene to see details</div>;
+import React from 'react';
+
+const DetailView = ({ shot }) => {
+  // Safety check: if no shot is selected, show a message
+  if (!shot) return <div className="panel detail mono">OFFLINE: SELECT_SHOT</div>;
 
   return (
     <div className="panel detail">
-      <h2>Scene Breakdown</h2>
-      <div style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '8px' }}>
-        <h3>{scene.slugline}</h3>
-        <p style={{ fontStyle: 'italic', color: '#555' }}>{scene.description}</p>
-        <hr />
-        <p><strong>Cast:</strong> {scene.cast.join(', ')}</p>
-        <p><strong>Location:</strong> {scene.type} Shot</p>
-        <p><strong>Current Status:</strong> <span style={{ color: scene.status === 'Wrapped' ? 'green' : 'orange' }}>{scene.status}</span></p>
+      <h2 className="panel-label mono">TECHNICAL_SPECS</h2>
+      <div className="spec-grid mono">
+        <div className="spec-item"><label>LENS</label><span>{shot.tech.lens}</span></div>
+        <div className="spec-item"><label>APERTURE</label><span>{shot.tech.aperture}</span></div>
+        <div className="spec-item"><label>MOVE</label><span>{shot.tech.movement}</span></div>
+        <div className="spec-item"><label>GEAR</label><span>{shot.tech.equip}</span></div>
+      </div>
+      <div className="shot-intent mono">
+        <label>DIRECTOR_NOTE:</label>
+        <p>{shot.desc}</p>
       </div>
     </div>
   );
-}
+};
+
+export default DetailView;

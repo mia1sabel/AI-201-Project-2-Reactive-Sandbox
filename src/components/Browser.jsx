@@ -1,24 +1,22 @@
-export default function Browser({ scenes, selectedId, onSelect }) {
+import React from 'react';
+
+const Browser = ({ shots, activeId, onSelect }) => {
   return (
     <div className="panel browser">
-      <h2>Daily Strip</h2>
-      {scenes.map(scene => (
+      <h2 className="panel-label">SHOT_LOG</h2>
+      {shots.map((shot) => (
         <div 
-          key={scene.id} 
-          className={`scene-card ${selectedId === scene.id ? 'active' : ''}`}
-          onClick={() => onSelect(scene.id)}
-          style={{ 
-            border: selectedId === scene.id ? '2px solid orange' : '1px solid #ccc', 
-            margin: '10px', 
-            padding: '10px', 
-            cursor: 'pointer',
-            backgroundColor: selectedId === scene.id ? '#f0f0f0' : 'white'
-          }}
+          key={shot.id} 
+          className={`strip ${shot.id === activeId ? 'active' : ''}`} 
+          onClick={() => onSelect(shot.id)}
         >
-          <strong>{scene.slugline}</strong> <br />
-          <small>Status: {scene.status}</small>
+          <span className={`status-dot ${shot.status}`}></span>
+          <span className="bold">{shot.scene}-{shot.shotNum}</span>
+          <p className="dim-text">{shot.desc}</p>
         </div>
       ))}
     </div>
   );
-}
+};
+
+export default Browser;

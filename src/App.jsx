@@ -1,53 +1,160 @@
-import { useState } from 'react'
-import './App.css'
-import Browser from './components/Browser'
-import DetailView from './components/DetailView'
-import Controller from './components/Controller'
+import React, { useState } from 'react';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// THE DEFINITIVE FIX: No local imports. We pull the exact matching v3 worker directly from the cloud.
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
+
+import Browser from './components/Browser';
+import Controller from './components/Controller';
+import DetailView from './components/DetailView';
+import './App.css';
 
 function App() {
-  const [data, setData] = useState({
-    selectedSceneId: 1,
-    scenes: [
-      { id: 1, slugline: "INT. APARTMENT - DAY", status: "Ready", type: "INT", description: "The protagonist discovers the hidden letter.", cast: ["Aria", "Ben"] },
-      { id: 2, slugline: "EXT. ALLEYWAY - NIGHT", status: "In Progress", type: "EXT", description: "Ben escapes through the back fire exit.", cast: ["Ben", "Thug #1"] },
-      { id: 3, slugline: "INT. OFFICE - DAY", status: "Ready", type: "INT", description: "The confrontation with the boss.", cast: ["Aria", "Boss"] }
-    ]
+  const [viewMode, setViewMode] = useState('portal');
+  const [isUploading, setIsUploading] = useState(false);
+  const [projectHistory, setProjectHistory] = useState([
+    { id: 'p1', title: 'MIDNIGHT_RISES', date: '2026-04-15' },
+    { id: 'p2', title: 'NEON_SHADOWS', date: '2026-03-10' }
+  ]);
+
+  const [data, setData] = useState({ 
+    projectTitle: "PENDING_IMPORT", 
+    day: "01", 
+    shots: [], 
+    activeShotId: null 
   });
 
-  const currentScene = data.scenes.find(s => s.id === data.selectedSceneId);
+  const activeShot = data.shots.find(s => s.id === data.activeShotId) || null;
 
-  const handleSelectScene = (id) => {
-    setData({ ...data, selectedSceneId: id });
-  };
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  // NEW LOGIC: Updates the status of a specific scene in the array
-  const handleUpdateStatus = (id, newStatus) => {
-    const updatedScenes = data.scenes.map(scene => {
-      if (scene.id === id) {
-        return { ...scene, status: newStatus };
+    setIsUploading(true);
+    const reader = new FileReader();
+
+    reader.onload = async (event) => {
+      try {
+        const typedarray = new Uint8Array(event.target.result);
+        const loadingTask = pdfjsLib.getDocument(typedarray);
+        const pdf = await loadingTask.promise;
+        let fullText = "";
+
+        // Extract text content from every page in the PDF
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          fullText += content.items.map(item => item.str).join(" ");
+        }
+
+        // PARSER: We look for the word "SCENE" or "Scene" followed by a number
+        const sceneMatches = fullText.match(/SCENE\s*\d+/gi);
+        
+        // If no scenes are found, we create a fallback list so the app doesn't break
+        const finalMatches = sceneMatches || ["SCENE_DEFAULT"];
+
+        const extractedShots = finalMatches.map((match, index) => ({
+          id: `shot-${index}`,
+          scene: match.toUpperCase().replace("SCENE", "").trim(),
+          shotNum: (index + 1).toString(),
+          status: "ready",
+          desc: "DYNAMICALLY_PARSED_FROM_SOURCE",
+          tech: { 
+            lens: "DETECTING...", 
+            aperture: "ANALYZING...", 
+            movement: "EXTRACTED", 
+            equip: "PDF_DATA" 
+          }
+        }));
+
+        const fileName = file.name.replace(".pdf", "").toUpperCase();
+
+        setData({
+          projectTitle: fileName,
+          day: "01",
+          shots: extractedShots,
+          activeShotId: extractedShots[0]?.id || null
+        });
+
+        // Add this new upload to our History sidebar
+        setProjectHistory(prev => [{ id: Date.now(), title: fileName, date: '2026-04-15' }, ...prev]);
+        setViewMode('dashboard');
+      } catch (error) {
+        console.error("PDF Parsing Error:", error);
+        alert(`SYSTEM_ERROR: ${error.message || "UNKNOWN_CORRUPTION_DETECTED"}`);
+      } finally {
+        setIsUploading(false);
       }
-      return scene;
-    });
-    setData({ ...data, scenes: updatedScenes });
+    };
+
+    reader.readAsArrayBuffer(file);
   };
+
+  const handleUpdateStatus = (newStatus) => {
+    const updatedShots = data.shots.map(shot => 
+      shot.id === data.activeShotId ? { ...shot, status: newStatus } : shot
+    );
+    setData({ ...data, shots: updatedShots });
+  };
+
+  if (viewMode === 'portal') {
+    return (
+      <div className="portal-root mono">
+        <div className="portal-container">
+          <h1 className="portal-logo">SYSTEM_PORTAL_V2.0</h1>
+          <div className="portal-grid">
+            <section className="portal-section">
+              <h2 className="panel-label">PROJECT_ARCHIVE</h2>
+              {projectHistory.map(proj => (
+                <div key={proj.id} className="history-card" onClick={() => setViewMode('dashboard')}>
+                  <span className="dim">{proj.date}</span>
+                  <span className="bold">{proj.title}</span>
+                </div>
+              ))}
+            </section>
+
+            <section className="portal-section">
+              <h2 className="panel-label">NEW_IMPORT_SCAN</h2>
+              <div className="upload-box">
+                {isUploading ? (
+                  <div className="loading-state">
+                    <p className="blink">SCANNING_PDF_COORDINATES...</p>
+                  </div>
+                ) : (
+                  <>
+                    <p>DROP_SHOT_LIST.PDF</p>
+                    <input type="file" accept=".pdf" onChange={handleFileUpload} className="file-input" />
+                    <button className="upload-btn">BEGIN_EXTRACTION</button>
+                  </>
+                )}
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', padding: '20px' }}>
-      <h1>Call Time: Production Dashboard</h1>
-      <div style={{ display: 'flex', gap: '20px', flex: 1 }}>
+    <div className="sandbox-root mono">
+      <header className="production-header">
+        <button onClick={() => setViewMode('portal')} className="back-btn">[TERMINATE_SESSION]</button>
+        <h1>{data.projectTitle} // DAY_{data.day}</h1>
+      </header>
+      <main className="panel-container">
         <Browser 
-          scenes={data.scenes} 
-          selectedId={data.selectedSceneId} 
-          onSelect={handleSelectScene} 
+          shots={data.shots} 
+          activeId={data.activeShotId} 
+          onSelect={(id) => setData({...data, activeShotId: id})} 
         />
-        <DetailView scene={currentScene} />
+        <DetailView shot={activeShot} />
         <Controller 
-          selectedScene={currentScene} 
-          onUpdateStatus={handleUpdateStatus} 
+          currentStatus={activeShot ? activeShot.status : 'ready'} 
+          onUpdate={handleUpdateStatus} 
         />
-      </div>
+      </main>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
